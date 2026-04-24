@@ -90,7 +90,7 @@ DASH = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Dashbroad - Slash HUB</title>
+<title>Dashboard</title>
 <meta http-equiv="refresh" content="5">
 <style>
 body { background:#0d0d0d; color:#00ffcc; font-family:monospace; padding:20px; }
@@ -126,7 +126,7 @@ th, td { border:1px solid #00ffcc33; padding:8px; text-align:center; }
 <body>
 
 <div class="header">
-    <div class="title">dashboard-backend</div>
+    <div class="title">Dashboard - Slash HUB</div>
     <a href="/logout"><button>logout</button></a>
 </div>
 
@@ -206,7 +206,7 @@ def logout():
 def home():
     return "Key Server Running"
 
-@app.route("/dashboard")
+@app.route("/dashboard-backend")
 def dashboard():
     if not login_required():
         return redirect("/login")
@@ -217,10 +217,6 @@ def dashboard():
 
     return render_template_string(DASH, KEYS=data, total=total, active=active)
 
-# 👉 alias ชื่อที่มึงอยากใช้
-@app.route("/dashbroad-backend")
-def dash_alias():
-    return dashboard()
 
 @app.route("/generate")
 def generate():
