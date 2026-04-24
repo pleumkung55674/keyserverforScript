@@ -1,55 +1,76 @@
--- 🔒 จุด 1
-local a = hookfunction
-if a then return end
+-- 🔒 SlashHub Guard (Lite Protection)
 
-local env = getfenv and getfenv() or _ENV
-if env ~= _G then return end
+-- กัน environment แปลก
+if _G._SLASH_LOADED then return end
+_G._SLASH_LOADED = true
 
--- 🔒 จุด 2
-if debug and (debug.getinfo or debug.getupvalue or debug.setupvalue) then
+-- เช็ค basic exploit env
+local function isExploitEnv()
+    if hookfunction or getgc or getrenv or getfenv ~= nil then
+        return true
+    end
+    return false
+end
+
+if isExploitEnv() then
+    warn("Exploit environment detected")
     return
 end
 
--- 🔒 จุด 3 (random trap)
-if math.random(1,50) == 17 then return end
-
--- 🎮 loading notify
+-- ป้องกัน debug hook เบื้องต้น
 pcall(function()
-    game.StarterGui:SetCore("SendNotification", {
+    if debug and debug.getinfo then
+        local info = debug.getinfo(1)
+        if info and info.what ~= "Lua" then
+            return
+        end
+    end
+end)
+
+-- safety check
+if not game or not game:IsLoaded() then
+    return
+end
+
+if not game:FindFirstChild("Players") then
+    return
+end
+
+-- โหลด function safe
+local function safeLoad(str)
+    local fn = loadstring or load
+    if not fn then return end
+
+    local success, result = pcall(fn(str))
+    if not success then
+        warn("Load failed")
+    end
+end
+
+-- notify (safe)
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "SlashHub",
         Text = "Loading...",
         Duration = 3
     })
 end)
 
--- 🔒 จุด 4
-if not game or not game.Players then return end
+-- 🔥 ===== SCRIPT REAL START =====
+-- ใส่โค้ดมึงตรงนี้
 
-local ls = loadstring
-if not ls or type(ls) ~= "function" then return end
+print("SlashHub Loaded")
 
--- 🔥 ===== เริ่มโค้ดจริง =====
+task.spawn(function()
+    wait(1)
+    print("Ready")
+end)
 
-print("🔥 SlashHub Loaded")
-
+-- notify finish
 pcall(function()
-    game.StarterGui:SetCore("SendNotification", {
+    game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "SlashHub",
         Text = "Welcome!",
         Duration = 5
     })
 end)
-
-print("🎮 Enjoy the game!")
-
-for i = 1,5 do
-    task.wait(0.2)
-end
-
-
-
-if hookfunction then
-    while true do
-        task.wait(1)
-    end
-end
