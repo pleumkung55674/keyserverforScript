@@ -8,28 +8,42 @@ import string
 app = Flask(__name__)
 
 # ================= ENV =================
-app.secret_key = os.environ.get("SECRET_KEY")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+app.secret_key = os.environ.get("SECRET_KEY") or "dev_secret_key"
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or "admin"
 
 # ================= SECURITY =================
-RATE_LIMIT = {}
 IP_LOG = {}
 SCRIPT_TOKENS = {}
+KEY_RATE = {}
 
 KEY_EXPIRE = 86400  # 1 day
 
+# ================= RATE LIMIT HYBRID =================
+RATE_IP = {}
+RATE_KEY = {}
 
-# ================= RATE LIMIT =================
-def rate_limit(ip):
+IP_LIMIT = 2
+KEY_LIMIT = 1
+
+
+def rate_limit(ip, key):
     now = time.time()
-    last = RATE_LIMIT.get(ip, 0)
-    if now - last < 2:
-        return False
-    RATE_LIMIT[ip] = now
-    return True
+
+    if ip and now - RATE_IP.get(ip, 0) < IP_LIMIT:
+        return True
+
+    if key and now - RATE_KEY.get(key, 0) < KEY_LIMIT:
+        return True
+
+    if ip:
+        RATE_IP[ip] = now
+    if key:
+        RATE_KEY[key] = now
+
+    return False
 
 
-# ================= LOG IP =================
+# ================= LOG =================
 def log_ip(ip, msg):
     IP_LOG[ip] = msg
     print(f"[IP:{ip}] {msg}")
@@ -55,7 +69,7 @@ def verify_token(key, token):
 
 # ================= DB =================
 def db():
-    return sqlite3.connect("keys.db")
+    return sqlite3.connect("keys.db", timeout=10, check_same_thread=False)
 
 
 def init_db():
@@ -115,12 +129,6 @@ def delete_key_db(key):
     c.execute("DELETE FROM keys WHERE key=?", (key,))
     conn.commit()
     conn.close()
-
-
-def is_expired(start_time):
-    if start_time is None:
-        return False
-    return (time.time() - start_time) > KEY_EXPIRE
 
 
 def get_expire_time(start_time):
@@ -237,20 +245,19 @@ Total Keys: {{ total }} | Active: {{ active }}
 
 LOGIN = """<form method="post"><input name="password"><button>login</button></form>"""
 
-
 # ================= ROUTES =================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        pw = request.form["password"]
+        pw = request.form.get("password", "")
 
         conn = db()
         c = conn.cursor()
         c.execute("SELECT password FROM admin WHERE id=1")
-        real = c.fetchone()[0]
+        real = c.fetchone()
         conn.close()
 
-        if pw == real:
+        if real and pw == real[0]:
             session["admin"] = True
             return redirect("/dashboard-backend")
 
@@ -293,13 +300,13 @@ def generate():
 
     amount = int(request.args.get("amount", 1))
 
-    keys = []
+    out = []
     for _ in range(amount):
         k = gen_key()
         add_key(k)
-        keys.append(k)
+        out.append(k)
 
-    return "<br>".join(keys)
+    return "<br>".join(out)
 
 
 @app.route("/delete")
@@ -308,7 +315,9 @@ def delete():
         return "no access"
 
     key = request.args.get("key")
-    delete_key_db(key)
+    if key:
+        delete_key_db(key)
+
     return redirect("/dashboard-backend")
 
 
@@ -328,46 +337,46 @@ def reset():
     return redirect("/dashboard-backend")
 
 
-# ================= SCRIPT SYSTEM =================
+# ================= SCRIPT =================
 @app.route("/script")
 def script():
-    key = request.args.get("key")
-    hwid = request.args.get("hwid")
-    token = request.args.get("token")
+    key = request.args.get("key", "")
+    hwid = request.args.get("hwid", "")
     ip = request.remote_addr
-
-    if not rate_limit(ip):
-        return "print('rate limit')"
 
     if not key or not hwid:
         return "print('invalid')"
 
+    if rate_limit(ip, key):
+        return "print('rate limited')"
+
     conn = db()
     c = conn.cursor()
-    c.execute("SELECT * FROM keys WHERE key=?", (key,))
+
+    c.execute("SELECT hwid, start_time FROM keys WHERE key=?", (key,))
     row = c.fetchone()
 
     if not row:
         conn.close()
         return "print('invalid key')"
 
-    db_hwid = row[1]
-    start_time = row[2]
+    db_hwid, start_time = row
+    now = time.time()
 
-    if start_time and (time.time() - start_time > KEY_EXPIRE):
+    if start_time and (now - start_time > KEY_EXPIRE):
         conn.close()
         return "print('expired')"
 
     if db_hwid is None:
-        c.execute("UPDATE keys SET hwid=?, start_time=? WHERE key=?",
-                  (hwid, time.time(), key))
+        c.execute(
+            "UPDATE keys SET hwid=?, start_time=? WHERE key=?",
+            (hwid, now, key)
+        )
         conn.commit()
 
     elif db_hwid != hwid:
         conn.close()
-        log_ip(ip, "HWID BLOCKED")
         return "print('hwid locked')"
-
 
     conn.close()
 
@@ -375,7 +384,7 @@ def script():
         with open("script.lua", "r", encoding="utf-8") as f:
             return f.read()
     except:
-        return "print('script missing')"
+        return "print('missing script')"
 
 
 # ================= START =================
