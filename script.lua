@@ -56,10 +56,7 @@ pcall(function()
     })
 end)
 
--- 🔥 ===== SCRIPT REAL START =====
--- ใส่โค้ดมึงตรงนี้
-
-print("SlashHub Loaded")
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DevHubScript/Roblox-Hack_pppp7404/main/Hangout.lua", true))()
 
 task.spawn(function()
     wait(1)
