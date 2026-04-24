@@ -22,23 +22,38 @@ KEY_EXPIRE = 86400  # 1 day
 RATE_IP = {}
 RATE_KEY = {}
 
+RATE_IP = {}
+RATE_KEY = {}
+
 IP_LIMIT = 2
 KEY_LIMIT = 1
-
 
 def rate_limit(ip, key):
     now = time.time()
 
-    if ip and now - RATE_IP.get(ip, 0) < IP_LIMIT:
+    if not ip:
+        ip = "unknown"
+
+    if not key:
+        key = "unknown"
+
+    # กันโตเกิน (สำคัญมากตอน deploy)
+    if len(RATE_IP) > 5000:
+        RATE_IP.clear()
+
+    if len(RATE_KEY) > 5000:
+        RATE_KEY.clear()
+
+    last_ip = RATE_IP.get(ip)
+    if last_ip and now - last_ip < IP_LIMIT:
         return True
 
-    if key and now - RATE_KEY.get(key, 0) < KEY_LIMIT:
+    last_key = RATE_KEY.get(key)
+    if last_key and now - last_key < KEY_LIMIT:
         return True
 
-    if ip:
-        RATE_IP[ip] = now
-    if key:
-        RATE_KEY[key] = now
+    RATE_IP[ip] = now
+    RATE_KEY[key] = now
 
     return False
 
