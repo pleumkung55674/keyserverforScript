@@ -368,12 +368,6 @@ def script():
         log_ip(ip, "HWID BLOCKED")
         return "print('hwid locked')"
 
-    if not token:
-        token = gen_token(key)
-
-    if not verify_token(key, token):
-        conn.close()
-        return "print('invalid token')"
 
     conn.close()
 
