@@ -336,6 +336,18 @@ def reset():
 
     return redirect("/dashboard-backend")
 
+@app.route("/debug-key")
+def debug_key():
+    key = request.args.get("key")
+
+    conn = db()
+    c = conn.cursor()
+    c.execute("SELECT key, hwid, start_time FROM keys WHERE key=?", (key,))
+    row = c.fetchone()
+    conn.close()
+
+    return str(row)
+
 
 # ================= SCRIPT =================
 @app.route("/script")
