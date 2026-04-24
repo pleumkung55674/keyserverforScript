@@ -147,15 +147,47 @@ DASH = """
 <meta http-equiv="refresh" content="5">
 <style>
 body { background:#0d0d0d; color:#00ffcc; font-family:monospace; padding:20px; }
-.header { display:flex; justify-content:space-between; margin-bottom:20px; }
-.card { background:#111; padding:15px; margin-bottom:20px; border-radius:10px; }
-table { width:100%; border-collapse:collapse; }
-th, td { border:1px solid #00ffcc33; padding:8px; text-align:center; }
-button { background:#00ffcc; border:none; padding:6px; border-radius:6px; }
-.del { background:red; }
-.reset { background:orange; }
+
+.header {
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:20px;
+}
+
+.card {
+    background:#111;
+    padding:15px;
+    margin-bottom:20px;
+    border-radius:10px;
+}
+
+table {
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td {
+    border:1px solid #00ffcc33;
+    padding:8px;
+    text-align:center;
+}
+
+button {
+    background:#00ffcc;
+    border:none;
+    padding:6px 10px;
+    border-radius:6px;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+.del { background:red; color:white; }
+.reset { background:orange; color:black; }
+.gen { background:#0077ff; color:white; }
+.copy { background:#00cc88; }
 </style>
 </head>
+
 <body>
 
 <div class="header">
@@ -165,6 +197,13 @@ button { background:#00ffcc; border:none; padding:6px; border-radius:6px; }
 
 <div class="card">
 Total Keys: {{ total }} | Active: {{ active }}
+</div>
+
+<div class="card">
+<form action="/generate">
+<input name="amount" value="1" style="width:60px;">
+<button class="gen">generate</button>
+</form>
 </div>
 
 <table>
@@ -183,6 +222,7 @@ Total Keys: {{ total }} | Active: {{ active }}
 <td>{{v["start_time"] or "-"}}</td>
 <td>{{v["expire"]}}</td>
 <td>
+<button class="copy" onclick="navigator.clipboard.writeText('{{k}}')">copy</button>
 <a href="/reset?key={{k}}"><button class="reset">reset</button></a>
 <a href="/delete?key={{k}}"><button class="del">del</button></a>
 </td>
