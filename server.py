@@ -191,7 +191,7 @@ def login():
 
         if pw == real:
             session["admin"] = True
-            return redirect("/dashboard")
+            return redirect("/dashboard-backend")
 
         return "wrong"
 
@@ -297,6 +297,41 @@ def check():
         return "expired"
 
     return "ok"
+
+@app.route("/script")
+def script():
+    key = request.args.get("key")
+    if not key:
+        return "print('no key')"
+
+    conn = db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM keys WHERE key=?", (key,))
+    row = c.fetchone()
+
+    if not row:
+        conn.close()
+        return "print('invalid key')"
+
+    # HWID bind แบบเดียวกับ check
+    hwid = request.headers.get("User-Agent")
+
+    if row[1] is None:
+        c.execute("UPDATE keys SET hwid=?, start_time=? WHERE key=?",
+                  (hwid, time.time(), key))
+        conn.commit()
+
+    elif row[1] != hwid:
+        conn.close()
+        return "print('hwid error')"
+
+    conn.close()
+
+    try:
+        with open("script.lua", "r", encoding="utf-8") as f:
+            return f.read()
+    except:
+        return "print('script missing')"
 
 # ================= START =================
 init_db()
