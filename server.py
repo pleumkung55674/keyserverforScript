@@ -6,7 +6,11 @@ import random
 import string
 
 app = Flask(__name__)
-app.secret_key = "SLASH_SECRET_123"
+
+# ================= ENV =================
+app.secret_key = os.environ.get("SECRET_KEY")
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
 # ================= DATABASE =================
 def db():
@@ -32,11 +36,13 @@ def init_db():
     )
     """)
 
-    c.execute("INSERT OR IGNORE INTO admin VALUES (1,'SLASH_ADMIN')")
+    # ใช้ ENV แทน hardcode
+    c.execute("INSERT OR IGNORE INTO admin VALUES (1, ?)", (ADMIN_PASSWORD,))
 
     conn.commit()
     conn.close()
 
+# ================= KEY SYSTEM =================
 def get_keys():
     conn = db()
     c = conn.cursor()
@@ -67,17 +73,15 @@ def delete_key_db(key):
     conn.commit()
     conn.close()
 
-# ================= EXPIRY =================
 def is_expired(start_time):
     if start_time is None:
         return False
     return (time.time() - start_time) > 86400
 
-# ================= ADMIN =================
+# ================= AUTH =================
 def login_required():
     return session.get("admin") == True
 
-# ================= KEY GEN =================
 def gen_key():
     return "SLASH-" + "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
 
@@ -86,11 +90,10 @@ DASH = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>dashboard-backend</title>
+<title>Dashbroad - Slash HUB</title>
 <meta http-equiv="refresh" content="5">
 <style>
 body { background:#0d0d0d; color:#00ffcc; font-family:monospace; padding:20px; }
-
 .header { display:flex; justify-content:space-between; margin-bottom:20px; }
 .title { font-size:22px; text-shadow:0 0 10px #00ffcc; }
 
@@ -111,23 +114,12 @@ button {
     font-weight:bold;
 }
 
-button:hover { background:#00ccaa; }
-
 .del { background:red; color:white; }
 .reset { background:orange; color:black; }
 .copy { background:#0077ff; color:white; }
 
-input {
-    background:#000;
-    border:1px solid #00ffcc;
-    color:#00ffcc;
-    padding:5px;
-    width:60px;
-}
-
 table { width:100%; border-collapse:collapse; }
 th, td { border:1px solid #00ffcc33; padding:8px; text-align:center; }
-th { background:#111; }
 </style>
 </head>
 
@@ -139,7 +131,7 @@ th { background:#111; }
 </div>
 
 <div class="card">
-    Total Keys: {{ total }} | Active: {{ active }}
+Total Keys: {{ total }} | Active: {{ active }}
 </div>
 
 <div class="card">
@@ -225,6 +217,11 @@ def dashboard():
 
     return render_template_string(DASH, KEYS=data, total=total, active=active)
 
+# 👉 alias ชื่อที่มึงอยากใช้
+@app.route("/dashbroad-backend")
+def dash_alias():
+    return dashboard()
+
 @app.route("/generate")
 def generate():
     if not login_required():
@@ -264,7 +261,7 @@ def reset():
 
     return redirect("/dashboard")
 
-# ================= ORIGINAL LOGIC =================
+# ================= CHECK API =================
 @app.route("/check")
 def check():
     key = request.args.get("key")
@@ -304,56 +301,6 @@ def check():
         return "expired"
 
     return "ok"
-
-# ================= SCRIPT LOADER =================
-@app.route("/script")
-def script_loader():
-    key = request.args.get("key")
-    hwid = request.headers.get("User-Agent")  # ใช้แทน hwid
-
-    if not key:
-        return "print('no key')"
-
-    # ===== ใช้ logic เดิม (copy จาก /check แบบไม่แตะของเดิม) =====
-    conn = db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM keys WHERE key=?", (key,))
-    row = c.fetchone()
-
-    if not row:
-        conn.close()
-        return "print('invalid')"
-
-    data = {
-        "hwid": row[1],
-        "start_time": row[2],
-        "status": row[3]
-    }
-
-    # bind ครั้งแรก
-    if data["hwid"] is None:
-        c.execute("UPDATE keys SET hwid=?, start_time=? WHERE key=?",
-                  (hwid, time.time(), key))
-        conn.commit()
-
-    elif data["hwid"] != hwid:
-        conn.close()
-        return "print('hwid_error')"
-
-    if is_expired(data["start_time"]):
-        conn.close()
-        return "print('expired')"
-
-    conn.close()
-
-    # ===== โหลดไฟล์ script.lua =====
-    try:
-        with open("script.lua", "r", encoding="utf-8") as f:
-            code = f.read()
-    except:
-        return "print('script missing')"
-
-    return code
 
 # ================= START =================
 init_db()
