@@ -1,33 +1,47 @@
--- 🔒 SlashHub Guard (Lite Protection)
+-- 🔒 SlashHub Smart Guard
 
--- กัน environment แปลก
 if _G._SLASH_LOADED then return end
 _G._SLASH_LOADED = true
 
--- เช็ค basic exploit env
-local function isExploitEnv()
-    if hookfunction or getgc or getrenv or getfenv ~= nil then
-        return true
-    end
-    return false
+local function safeType(v, t)
+    return typeof(v) == t
 end
 
-if isExploitEnv() then
-    warn("Exploit environment detected")
-    return
-end
+-- 🧠 smart detection (ลด false positive)
+local function isSuspiciousEnv()
+    local score = 0
 
--- ป้องกัน debug hook เบื้องต้น
-pcall(function()
+    -- check debug tampering (เบื้องต้น)
     if debug and debug.getinfo then
         local info = debug.getinfo(1)
         if info and info.what ~= "Lua" then
-            return
+            score += 1
         end
     end
-end)
 
--- safety check
+    -- check unusual globals (ไม่ hard fail)
+    if typeof(getgc) == "function" then
+        score += 1
+    end
+
+    if typeof(hookfunction) == "function" then
+        score += 1
+    end
+
+    if typeof(getrenv) == "function" then
+        score += 1
+    end
+
+    -- decision (threshold)
+    return score >= 3
+end
+
+-- ❗ ไม่ block ทันที แค่ warn
+if isSuspiciousEnv() then
+    warn("[SlashHub] Suspicious environment detected")
+end
+
+-- safety checks
 if not game or not game:IsLoaded() then
     return
 end
@@ -36,18 +50,21 @@ if not game:FindFirstChild("Players") then
     return
 end
 
--- โหลด function safe
+-- safe loader
 local function safeLoad(str)
     local fn = loadstring or load
     if not fn then return end
 
-    local success, result = pcall(fn(str))
+    local success, err = pcall(function()
+        fn(str)()
+    end)
+
     if not success then
-        warn("Load failed")
+        warn("Load failed:", err)
     end
 end
 
--- notify (safe)
+-- notify
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "SlashHub",
@@ -59,11 +76,10 @@ end)
 loadstring(game:HttpGet("https://raw.githubusercontent.com/DevHubScript/Roblox-Hack_pppp7404/main/Hangout.lua", true))()
 
 task.spawn(function()
-    wait(1)
+    task.wait(1)
     print("Ready")
 end)
 
--- notify finish
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "SlashHub",
