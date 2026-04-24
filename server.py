@@ -19,41 +19,40 @@ KEY_RATE = {}
 KEY_EXPIRE = 86400  # 1 day
 
 # ================= RATE LIMIT HYBRID =================
-RATE_IP = {}
-RATE_KEY = {}
+RATE_COUNT = {}
 
-RATE_IP = {}
-RATE_KEY = {}
+LIMIT = 10
+WINDOW = 5
 
-IP_LIMIT = 2
-KEY_LIMIT = 1
 
 def rate_limit(ip, key):
     now = time.time()
 
-    if not ip:
-        ip = "unknown"
-
     if not key:
-        key = "unknown"
+        return False
 
-    # กันโตเกิน (สำคัญมากตอน deploy)
-    if len(RATE_IP) > 5000:
-        RATE_IP.clear()
+    data = RATE_COUNT.get(key)
 
-    if len(RATE_KEY) > 5000:
-        RATE_KEY.clear()
+    # init
+    if data is None:
+        RATE_COUNT[key] = {"count": 1, "start": now}
+        return False
 
-    last_ip = RATE_IP.get(ip)
-    if last_ip and now - last_ip < IP_LIMIT:
+    # reset window
+    if now - data["start"] > WINDOW:
+        RATE_COUNT[key] = {"count": 1, "start": now}
+        return False
+
+    # safe update (ไม่ mutate object เดิม)
+    new_count = data["count"] + 1
+
+    if new_count > LIMIT:
         return True
 
-    last_key = RATE_KEY.get(key)
-    if last_key and now - last_key < KEY_LIMIT:
-        return True
-
-    RATE_IP[ip] = now
-    RATE_KEY[key] = now
+    RATE_COUNT[key] = {
+        "count": new_count,
+        "start": data["start"]
+    }
 
     return False
 
